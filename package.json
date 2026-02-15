@@ -14,11 +14,12 @@
     "pipeline:full": "npm run scrape:panels -- --arc alabasta && npm run process:ocr -- --input data/raw/panels/alabasta.json && npm run process:embeddings -- --input data/processed/panels/alabasta.json && npm run import:supabase -- --panels data/embeddings/panels/alabasta.json"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.7",
+    "@supabase/supabase-js": "^2.95.3",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
+    "dotenv": "^17.3.1",
     "next": "16.1.6",
-    "openai": "^4.76.0",
+    "openai": "^6.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tesseract.js": "^5.1.1"

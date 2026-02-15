@@ -93,3 +93,74 @@ CREATE TRIGGER user_profiles_updated_at
   BEFORE UPDATE ON user_profiles
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at();
+
+-- Vector search function for panels
+CREATE OR REPLACE FUNCTION search_panels(
+  query_embedding VECTOR(1536),
+  match_threshold FLOAT DEFAULT 0.7,
+  match_count INT DEFAULT 20
+)
+RETURNS TABLE (
+  id UUID,
+  chapter_number INT,
+  chapter_title TEXT,
+  page_number INT,
+  panel_number INT,
+  image_url TEXT,
+  dialogue TEXT,
+  characters TEXT[],
+  similarity FLOAT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    p.id,
+    c.number AS chapter_number,
+    c.title AS chapter_title,
+    p.page_number,
+    p.panel_number,
+    p.image_url,
+    p.dialogue,
+    p.characters,
+    1 - (p.embedding <=> query_embedding) AS similarity
+  FROM panels p
+  JOIN chapters c ON p.chapter_id = c.id
+  WHERE p.embedding IS NOT NULL
+    AND 1 - (p.embedding <=> query_embedding) > match_threshold
+  ORDER BY p.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;
+
+-- Vector search function for SBS entries
+CREATE OR REPLACE FUNCTION search_sbs(
+  query_embedding VECTOR(1536),
+  match_threshold FLOAT DEFAULT 0.7,
+  match_count INT DEFAULT 5
+)
+RETURNS TABLE (
+  id UUID,
+  volume INT,
+  question TEXT,
+  answer TEXT,
+  similarity FLOAT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    s.id,
+    s.volume,
+    s.question,
+    s.answer,
+    1 - (s.embedding <=> query_embedding) AS similarity
+  FROM sbs_entries s
+  WHERE s.embedding IS NOT NULL
+    AND 1 - (s.embedding <=> query_embedding) > match_threshold
+  ORDER BY s.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;
