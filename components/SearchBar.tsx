@@ -2,30 +2,23 @@
 
 import { useState } from 'react';
 
-export default function SearchBar() {
+interface SearchBarProps {
+  onSearch: (query: string, method: 'semantic' | 'fulltext') => void;
+  isSearching: boolean;
+}
+
+export default function SearchBar({ onSearch, isSearching }: SearchBarProps) {
   const [query, setQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [searchPanels, setSearchPanels] = useState(true);
+  const [searchSBS, setSearchSBS] = useState(true);
+  const [useAI, setUseAI] = useState(false);
+  const [searchMethod, setSearchMethod] = useState<'semantic' | 'fulltext'>('fulltext');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
-    setIsSearching(true);
-    try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-
-      const data = await response.json();
-      console.log('Search results:', data);
-      // TODO: Update panel grid with results
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setIsSearching(false);
-    }
+    onSearch(query, searchMethod);
   };
 
   return (
@@ -35,7 +28,7 @@ export default function SearchBar() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ask anything... (e.g., 'When did Luffy unlock Gear Second?')"
+          placeholder="Search for characters, arcs, or moments... (e.g., 'Luffy Gear Second')"
           className="w-full px-6 py-4 bg-slate-800 text-white rounded-xl border-2 border-slate-700 focus:border-amber-500 focus:outline-none placeholder-slate-500 text-lg"
           disabled={isSearching}
         />
@@ -50,16 +43,42 @@ export default function SearchBar() {
       
       <div className="flex items-center gap-4 mt-3 text-sm text-slate-400">
         <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" className="rounded" />
+          <input 
+            type="checkbox" 
+            className="rounded" 
+            checked={searchPanels}
+            onChange={(e) => setSearchPanels(e.target.checked)}
+          />
           <span>Search panels</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" className="rounded" />
+          <input 
+            type="checkbox" 
+            className="rounded"
+            checked={searchSBS}
+            onChange={(e) => setSearchSBS(e.target.checked)}
+          />
           <span>Include SBS</span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" className="rounded" />
-          <span>AI Answer (Pro)</span>
+        <label className="flex items-center gap-2 cursor-pointer hover:text-amber-400 transition-colors">
+          <input 
+            type="radio" 
+            name="searchMethod"
+            className="rounded-full" 
+            checked={searchMethod === 'fulltext'}
+            onChange={() => setSearchMethod('fulltext')}
+          />
+          <span>Fast Search (Free)</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer hover:text-amber-400 transition-colors">
+          <input 
+            type="radio" 
+            name="searchMethod"
+            className="rounded-full" 
+            checked={searchMethod === 'semantic'}
+            onChange={() => setSearchMethod('semantic')}
+          />
+          <span>AI Search (Pro) 🔒</span>
         </label>
       </div>
     </form>
