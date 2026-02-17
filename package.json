@@ -5,12 +5,23 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "scrape:panels": "tsx scripts/scrapers/panels.ts",
+    "scrape:sbs": "tsx scripts/scrapers/sbs.ts",
+    "process:ocr": "tsx scripts/process/ocr.ts",
+    "process:embeddings": "tsx scripts/process/embeddings.ts",
+    "import:supabase": "tsx scripts/import/supabase.ts",
+    "pipeline:full": "npm run scrape:panels -- --arc alabasta && npm run process:ocr -- --input data/raw/panels/alabasta.json && npm run process:embeddings -- --input data/processed/panels/alabasta.json && npm run import:supabase -- --panels data/embeddings/panels/alabasta.json"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.7",
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
     "next": "16.1.6",
+    "openai": "^4.76.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -18,6 +29,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
