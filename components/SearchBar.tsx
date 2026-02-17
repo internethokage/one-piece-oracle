@@ -5,19 +5,16 @@ import { useState } from 'react';
 interface SearchBarProps {
   onSearch: (query: string, method: 'semantic' | 'fulltext') => void;
   isSearching: boolean;
+  isPro?: boolean;
 }
 
-export default function SearchBar({ onSearch, isSearching }: SearchBarProps) {
+export default function SearchBar({ onSearch, isSearching, isPro = false }: SearchBarProps) {
   const [query, setQuery] = useState('');
-  const [searchPanels, setSearchPanels] = useState(true);
-  const [searchSBS, setSearchSBS] = useState(true);
-  const [useAI, setUseAI] = useState(false);
   const [searchMethod, setSearchMethod] = useState<'semantic' | 'fulltext'>('fulltext');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-
     onSearch(query, searchMethod);
   };
 
@@ -28,7 +25,7 @@ export default function SearchBar({ onSearch, isSearching }: SearchBarProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search for characters, arcs, or moments... (e.g., 'Luffy Gear Second')"
+          placeholder="Search characters, arcs, or moments... (e.g., 'Luffy Gear Second')"
           className="w-full px-6 py-4 bg-slate-800 text-white rounded-xl border-2 border-slate-700 focus:border-amber-500 focus:outline-none placeholder-slate-500 text-lg"
           disabled={isSearching}
         />
@@ -40,45 +37,37 @@ export default function SearchBar({ onSearch, isSearching }: SearchBarProps) {
           {isSearching ? 'Searching...' : 'Search'}
         </button>
       </div>
-      
-      <div className="flex items-center gap-4 mt-3 text-sm text-slate-400">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input 
-            type="checkbox" 
-            className="rounded" 
-            checked={searchPanels}
-            onChange={(e) => setSearchPanels(e.target.checked)}
-          />
-          <span>Search panels</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input 
-            type="checkbox" 
-            className="rounded"
-            checked={searchSBS}
-            onChange={(e) => setSearchSBS(e.target.checked)}
-          />
-          <span>Include SBS</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer hover:text-amber-400 transition-colors">
-          <input 
-            type="radio" 
+
+      {/* Search method toggle */}
+      <div className="flex items-center gap-4 mt-3 text-sm text-slate-400 flex-wrap">
+        <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+          <input
+            type="radio"
             name="searchMethod"
-            className="rounded-full" 
             checked={searchMethod === 'fulltext'}
             onChange={() => setSearchMethod('fulltext')}
+            className="accent-amber-500"
           />
           <span>Fast Search (Free)</span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer hover:text-amber-400 transition-colors">
-          <input 
-            type="radio" 
+
+        <label
+          className={`flex items-center gap-2 transition-colors ${
+            isPro ? 'cursor-pointer hover:text-amber-400' : 'cursor-pointer hover:text-slate-300'
+          }`}
+          title={isPro ? 'Semantic AI search' : 'Requires Pro subscription'}
+        >
+          <input
+            type="radio"
             name="searchMethod"
-            className="rounded-full" 
             checked={searchMethod === 'semantic'}
             onChange={() => setSearchMethod('semantic')}
+            className="accent-amber-500"
           />
-          <span>AI Search (Pro) 🔒</span>
+          <span className={isPro ? 'text-amber-300' : ''}>
+            AI Search {isPro ? '✨' : '🔒'}
+          </span>
+          {!isPro && <span className="text-xs text-amber-600">(Pro)</span>}
         </label>
       </div>
     </form>
