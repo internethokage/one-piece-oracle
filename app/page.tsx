@@ -1,11 +1,71 @@
+'use client';
+
+import { useState } from 'react';
 import SearchBar from '@/components/SearchBar';
 import PanelGrid from '@/components/PanelGrid';
+import AskQuestion from '@/components/AskQuestion';
+
+interface Panel {
+  id: string;
+  chapter_number: number;
+  chapter_title?: string;
+  page_number: number;
+  panel_number: number;
+  image_url: string;
+  dialogue?: string;
+  characters?: string[];
+  similarity?: number;
+}
+
+interface SBSEntry {
+  id: string;
+  volume: number;
+  question: string;
+  answer: string;
+  similarity?: number;
+}
+
+interface SearchResults {
+  panels: Panel[];
+  sbs: SBSEntry[];
+}
 
 export default function Home() {
+  const [searchResults, setSearchResults] = useState<SearchResults>({ panels: [], sbs: [] });
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = async (query: string, method: 'semantic' | 'fulltext') => {
+    if (!query.trim()) return;
+    
+    setSearchQuery(query);
+    setIsSearching(true);
+    
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, method }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSearchResults(data.results);
+      } else {
+        console.error('Search failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Search request failed:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-blue-950 to-slate-900">
       {/* Header */}
-      <header className="border-b border-amber-500/20 bg-slate-900/80 backdrop-blur-sm">
+      <header className="border-b border-amber-500/20 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -33,7 +93,7 @@ export default function Home() {
           </p>
           
           {/* Search Bar */}
-          <SearchBar />
+          <SearchBar onSearch={handleSearch} isSearching={isSearching} />
 
           {/* Feature Pills */}
           <div className="flex flex-wrap justify-center gap-3 mt-8">
@@ -49,28 +109,95 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Example Queries */}
-        <div className="max-w-3xl mx-auto mb-12">
-          <h3 className="text-lg font-semibold text-slate-300 mb-4">Try searching for:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {[
-              "Luffy's Gear Second first appearance",
-              "All members of the Worst Generation",
-              "Zoro's swords timeline",
-              "Going Merry farewell scene"
-            ].map((query) => (
-              <button
-                key={query}
-                className="px-4 py-3 bg-slate-800/50 hover:bg-slate-800 text-left text-slate-300 rounded-lg border border-slate-700 hover:border-amber-500/50 transition-all"
-              >
-                "{query}"
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* AI Question Component (shows when no search results) */}
+        {searchResults.panels.length === 0 && searchResults.sbs.length === 0 && !isSearching && (
+          <>
+            {/* Example Queries */}
+            <div className="max-w-3xl mx-auto mb-12">
+              <h3 className="text-lg font-semibold text-slate-300 mb-4">Try searching for:</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  "Luffy's Gear Second first appearance",
+                  "All members of the Worst Generation",
+                  "Zoro's swords timeline",
+                  "Going Merry farewell scene"
+                ].map((query) => (
+                  <button
+                    key={query}
+                    onClick={() => handleSearch(query, 'fulltext')}
+                    className="px-4 py-3 bg-slate-800/50 hover:bg-slate-800 text-left text-slate-300 rounded-lg border border-slate-700 hover:border-amber-500/50 transition-all"
+                  >
+                    "{query}"
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Panel Grid (placeholder for now) */}
-        <PanelGrid panels={[]} />
+            {/* Ask AI Question */}
+            <AskQuestion />
+          </>
+        )}
+
+        {/* Search Results */}
+        {(searchResults.panels.length > 0 || searchResults.sbs.length > 0) && (
+          <div className="max-w-6xl mx-auto">
+            {/* Results Header */}
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold text-white mb-2">
+                Search Results for "{searchQuery}"
+              </h3>
+              <p className="text-slate-400">
+                Found {searchResults.panels.length} panels and {searchResults.sbs.length} SBS entries
+              </p>
+            </div>
+
+            {/* SBS Results (if any) */}
+            {searchResults.sbs.length > 0 && (
+              <div className="mb-8">
+                <h4 className="text-xl font-semibold text-amber-400 mb-4">📚 SBS Entries</h4>
+                <div className="space-y-4">
+                  {searchResults.sbs.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="bg-slate-800/50 rounded-lg border border-slate-700 p-6"
+                    >
+                      <div className="text-xs text-amber-400 font-semibold mb-2">
+                        Volume {entry.volume}
+                        {entry.similarity && (
+                          <span className="ml-3 text-slate-400">
+                            {Math.round(entry.similarity * 100)}% match
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-blue-300 mb-2 font-semibold">
+                        Q: {entry.question}
+                      </div>
+                      <div className="text-sm text-slate-300">
+                        A: {entry.answer}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Panel Results */}
+            {searchResults.panels.length > 0 && (
+              <div>
+                <h4 className="text-xl font-semibold text-amber-400 mb-4">📖 Manga Panels</h4>
+                <PanelGrid panels={searchResults.panels} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isSearching && (
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mb-4"></div>
+            <p className="text-slate-400">Searching the Grand Line...</p>
+          </div>
+        )}
 
         {/* Pricing Teaser */}
         <div className="max-w-4xl mx-auto mt-16 p-8 bg-gradient-to-r from-amber-900/20 to-blue-900/20 rounded-2xl border border-amber-500/20">

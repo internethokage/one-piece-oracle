@@ -3,11 +3,13 @@
 interface Panel {
   id: string;
   chapter_number: number;
+  chapter_title?: string;
   page_number: number;
   panel_number: number;
   image_url: string;
   dialogue?: string;
   characters?: string[];
+  similarity?: number;
 }
 
 interface PanelGridProps {
@@ -38,14 +40,28 @@ export default function PanelGrid({ panels }: PanelGridProps) {
               src={panel.image_url}
               alt={`Chapter ${panel.chapter_number}, Page ${panel.page_number}, Panel ${panel.panel_number}`}
               className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                // Fallback to placeholder if image fails to load
+                (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="600"%3E%3Crect width="100%25" height="100%25" fill="%23334155"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="20"%3EPanel Placeholder%3C/text%3E%3C/svg%3E';
+              }}
             />
             {/* Overlay with chapter info */}
             <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-3">
-              <div className="text-xs font-semibold text-amber-400">
-                Chapter {panel.chapter_number}
-              </div>
-              <div className="text-xs text-slate-300">
-                Page {panel.page_number} · Panel {panel.panel_number}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-amber-400">
+                    Chapter {panel.chapter_number}
+                    {panel.chapter_title && ` - ${panel.chapter_title}`}
+                  </div>
+                  <div className="text-xs text-slate-300">
+                    Page {panel.page_number} · Panel {panel.panel_number}
+                  </div>
+                </div>
+                {panel.similarity !== undefined && (
+                  <div className="bg-purple-500/80 text-white text-xs font-bold px-2 py-1 rounded">
+                    {Math.round(panel.similarity * 100)}%
+                  </div>
+                )}
               </div>
             </div>
           </div>
