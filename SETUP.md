@@ -1,15 +1,19 @@
-# One Piece Oracle - Setup Guide
+# Setup Guide — One Piece Oracle
 
-Complete setup instructions for getting One Piece Oracle running locally and in production.
+This guide walks you through setting up One Piece Oracle locally with Supabase Auth + Stripe.
+
+---
 
 ## Prerequisites
 
-- **Node.js** 18+ and npm
-- **Supabase account** (free tier works)
-- **OpenAI API key** (for embeddings and LLM)
-- **Git** for version control
+- Node.js 18+
+- A [Supabase](https://supabase.com) account (free tier is fine)
+- A [Stripe](https://stripe.com) account (test mode)
+- An [OpenAI](https://platform.openai.com) API key (for embeddings + LLM)
 
-## Step 1: Clone and Install
+---
+
+## 1. Clone & Install
 
 ```bash
 git clone https://github.com/internethokage/one-piece-oracle.git
@@ -17,254 +21,175 @@ cd one-piece-oracle
 npm install
 ```
 
-## Step 2: Set Up Supabase
+---
 
-### 2.1 Create Supabase Project
+## 2. Supabase Setup
 
-1. Go to [Supabase Dashboard](https://app.supabase.com)
-2. Click "New Project"
+### 2a. Create Project
+1. Go to [supabase.com/dashboard](https://supabase.com/dashboard)
+2. Click **New project**
 3. Name: `one-piece-oracle`
-4. Set a strong database password
-5. Choose a region close to you
-6. Wait for project to finish provisioning (~2 minutes)
+4. Region: closest to your users (US East recommended)
+5. Generate a strong database password
 
-### 2.2 Run Database Schema
+### 2b. Run Schema
+1. Go to **SQL Editor** in Supabase Dashboard
+2. Paste the contents of `supabase/schema.sql`
+3. Click **Run**
 
-1. In your Supabase project dashboard, go to **SQL Editor**
-2. Click "New Query"
-3. Copy the entire contents of `supabase/schema.sql`
-4. Paste into the query editor
-5. Click "Run" or press `Cmd/Ctrl + Enter`
+This creates:
+- `chapters` — manga chapter metadata
+- `panels` — panel data with vector embeddings
+- `sbs_entries` — SBS Q&A with vector embeddings
+- `user_profiles` — user accounts + Stripe billing
+- `search_panels()` — vector search function
+- `search_sbs()` — vector search function
+- Row Level Security (RLS) policies
+- Auth trigger (auto-creates profile on signup)
 
-This will create:
-- ✅ `chapters`, `panels`, `sbs_entries` tables
-- ✅ Vector search indexes (pgvector)
-- ✅ Full-text search indexes
-- ✅ RPC functions (`search_panels`, `search_sbs`)
-- ✅ Row Level Security policies
+### 2c. Enable pgvector
+pgvector is enabled automatically by the schema's `CREATE EXTENSION IF NOT EXISTS vector;`
 
-### 2.3 Get API Keys
+### 2d. Enable Google OAuth (optional)
+1. Go to **Authentication → Providers**
+2. Enable **Google**
+3. Add your Google OAuth credentials
+4. Authorized redirect URI: `https://your-project.supabase.co/auth/v1/callback`
 
-In your Supabase project:
+### 2e. Get API Keys
+Go to **Project Settings → API**:
+- `NEXT_PUBLIC_SUPABASE_URL` — Project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anon/public key
+- `SUPABASE_SERVICE_KEY` — service_role key (⚠️ secret, server-only)
 
-1. Go to **Settings** → **API**
-2. Copy your **Project URL** → This is `NEXT_PUBLIC_SUPABASE_URL`
-3. Copy your **service_role key** (not anon!) → This is `SUPABASE_SERVICE_KEY`
+---
 
-⚠️ **Never commit the service_role key to Git!**
+## 3. Stripe Setup
 
-### 2.4 Set Up Storage (for panel images)
+### 3a. Create Product
+1. Go to [stripe.com/dashboard](https://dashboard.stripe.com)
+2. **Products → Add product**
+3. Name: `One Piece Oracle Pro`
+4. Pricing: $5 / month, recurring
+5. Copy the **Price ID** (starts with `price_`)
 
-1. Go to **Storage** in Supabase dashboard
-2. Click "Create a new bucket"
-3. Name: `manga-panels`
-4. Public bucket: **Yes** (so images are accessible)
-5. Click "Create bucket"
+### 3b. Get API Keys
+Go to **Developers → API Keys**:
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Publishable key
+- `STRIPE_SECRET_KEY` — Secret key
 
-## Step 3: Configure Environment Variables
+### 3c. Set Up Webhook
+1. **Developers → Webhooks → Add endpoint**
+2. Endpoint URL: `https://your-domain.com/api/webhooks/stripe`
+3. Events to listen for:
+   - `checkout.session.completed`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_failed`
+4. Copy **Signing secret** → `STRIPE_WEBHOOK_SECRET`
 
-Create `.env.local` in the project root:
+**For local development**, use Stripe CLI:
+```bash
+brew install stripe/stripe-cli/stripe
+stripe login
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+The CLI prints a local webhook secret — use it as `STRIPE_WEBHOOK_SECRET`.
+
+---
+
+## 4. Environment Variables
 
 ```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with your credentials:
+Edit `.env.local` with all values from steps 2 and 3:
 
 ```env
-# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_KEY=your-service-role-key
 
-# OpenAI
-OPENAI_API_KEY=sk-your-openai-key
+OPENAI_API_KEY=sk-...
 
-# Optional: Custom LLM model
-LLM_MODEL=gpt-4-turbo-preview
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRO_PRICE_ID=price_...
 
-# App URL
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-## Step 4: Ingest Data (First-Time Setup)
+---
 
-### Option A: Run Full Data Pipeline
-
-If you want to scrape and process manga panels yourself:
-
-```bash
-# Scrape Alabasta arc panels from One Piece Wiki
-npm run scrape:panels -- --arc alabasta
-
-# Extract text from panels using OCR
-npm run process:ocr -- --input data/raw/panels/alabasta.json
-
-# Generate embeddings
-npm run process:embeddings -- --input data/processed/panels/
-
-# Import to Supabase
-npm run import:supabase -- --panels data/embeddings/panels/
-```
-
-**Note:** This will take 24-48 hours and cost ~$0.20 in OpenAI API fees (for embeddings).
-
-See `DATA_PIPELINE.md` for detailed pipeline instructions.
-
-### Option B: Use Sample Data (Faster)
-
-For testing, you can manually insert a few sample records:
-
-```sql
--- In Supabase SQL Editor
-
--- Insert sample chapter
-INSERT INTO chapters (number, title, arc, volume)
-VALUES (1, 'Romance Dawn', 'Romance Dawn', 1);
-
--- Get the chapter ID
-SELECT id FROM chapters WHERE number = 1;
-
--- Insert sample panel (replace <chapter-id> with actual UUID)
-INSERT INTO panels (
-  chapter_id,
-  page_number,
-  panel_number,
-  image_url,
-  dialogue,
-  characters
-) VALUES (
-  '<chapter-id>',
-  1,
-  1,
-  'https://via.placeholder.com/400x300',
-  'I''m gonna be King of the Pirates!',
-  ARRAY['Monkey D. Luffy']
-);
-```
-
-## Step 5: Run Development Server
+## 5. Run Locally
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Step 6: Test the APIs
+Test the flow:
+1. Click "Get Started Free" → create account
+2. Verify email (check inbox or disable in Supabase Auth settings)
+3. Sign in
+4. Click "Upgrade to Pro" → complete Stripe checkout (use test card `4242 4242 4242 4242`)
+5. Verify Pro badge appears in header
 
-### Test Search API
+---
 
-```bash
-curl -X POST http://localhost:3000/api/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Luffy", "method": "fulltext"}'
-```
+## 6. Run Data Pipeline
 
-Expected response:
-```json
-{
-  "success": true,
-  "query": "Luffy",
-  "method": "fulltext",
-  "results": {
-    "panels": [...],
-    "sbs": [...]
-  }
-}
-```
-
-### Test LLM Q&A API (Pro Tier)
+Once auth is working, populate the database:
 
 ```bash
-curl -X POST http://localhost:3000/api/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What is Gear Second?", "user_tier": "pro"}'
+# Scrape Alabasta arc panels from One Piece Wiki
+npm run scrape:panels -- --arc alabasta
+
+# OCR text from panel images
+npm run process:ocr -- --input data/raw/panels/alabasta.json
+
+# Generate OpenAI embeddings
+npm run process:embeddings -- --input data/processed/panels/
+
+# Import to Supabase
+npm run import:supabase -- --panels data/embeddings/panels/
+
+# Scrape + import SBS entries
+npm run scrape:sbs
+npm run import:supabase -- --sbs data/raw/sbs/
 ```
 
-Expected response:
-```json
-{
-  "success": true,
-  "question": "What is Gear Second?",
-  "answer": "Gear Second is a technique where...",
-  "citations": [...]
-}
-```
+See `DATA_PIPELINE.md` for detailed instructions.
 
-## Troubleshooting
+---
 
-### "Supabase not configured" error
-
-- Verify `.env.local` exists and has correct values
-- Restart dev server (`Ctrl+C`, then `npm run dev`)
-- Check Supabase project URL is correct (should end in `.supabase.co`)
-
-### "relation 'panels' does not exist"
-
-- Make sure you ran `supabase/schema.sql` in SQL Editor
-- Check for errors in the SQL output
-
-### "function search_panels does not exist"
-
-- The RPC functions are defined in `supabase/schema.sql`
-- Re-run the schema file to create them
-
-### OpenAI API errors
-
-- Verify your `OPENAI_API_KEY` is correct
-- Check you have credits in your OpenAI account
-- For embeddings: ada-002 costs $0.0001/1K tokens (~$0.20 for 1,000 panels)
-
-### Vector search returns no results
-
-- Make sure panels have embeddings (check `panels.embedding IS NOT NULL`)
-- Lower the `match_threshold` in API calls (try 0.5 instead of 0.7)
-- Verify pgvector extension is enabled (`SELECT * FROM pg_extension WHERE extname = 'vector';`)
-
-## Next Steps
-
-1. **Scrape more data** - Expand beyond Alabasta arc
-2. **Add authentication** - Wire up Supabase Auth for user login
-3. **Implement Stripe** - Add Pro subscription billing
-4. **Build agent system** - Multi-step LLM reports (timelines, theories)
-5. **Deploy to Vercel** - Production deployment
-
-See `MVP_SPEC.md` for the full roadmap.
-
-## Production Deployment
-
-### Deploy to Vercel
+## 7. Deploy to Vercel
 
 ```bash
-# Install Vercel CLI
 npm i -g vercel
-
-# Deploy
 vercel
-
-# Add environment variables in Vercel dashboard
-# Settings → Environment Variables → Add each var from .env.local
 ```
 
-### Set Up Stripe (Pro Subscriptions)
+Set all environment variables in Vercel Dashboard → Project Settings → Environment Variables.
 
-1. Create Stripe account at [stripe.com](https://stripe.com)
-2. Get API keys from Stripe Dashboard
-3. Create a $5/month product
-4. Add keys to `.env.local`:
-   ```env
-   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
-   STRIPE_SECRET_KEY=sk_live_...
-   ```
-5. Set up webhook endpoint: `https://your-domain.com/api/webhooks/stripe`
+Update `NEXT_PUBLIC_APP_URL` to your production URL.
+Update Stripe webhook endpoint to your production URL.
 
 ---
 
-## Support
+## Architecture Overview
 
-- **Issues:** [GitHub Issues](https://github.com/internethokage/one-piece-oracle/issues)
-- **Email:** tre@example.com
+```
+User → Next.js (Vercel)
+         ├─ /api/search     → Supabase pgvector semantic search
+         ├─ /api/ask        → OpenAI embeddings + RAG + LLM answer
+         ├─ /api/checkout   → Stripe Checkout session
+         ├─ /api/webhooks/stripe → Stripe events → update user_profiles
+         ├─ /api/user       → Auth check + tier lookup
+         └─ /auth/callback  → Supabase OAuth callback
+```
 
----
-
-Built with ❤️ and 🏴‍☠️ by [Tre](https://github.com/internethokage)
+See `ARCHITECTURE.md` for the full system design.
