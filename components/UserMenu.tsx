@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 interface UserMenuProps {
@@ -9,6 +10,7 @@ interface UserMenuProps {
 
 export default function UserMenu({ onUpgradeClick }: UserMenuProps) {
   const { user, isPro, tier, signOut } = useAuth();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -91,7 +93,7 @@ export default function UserMenu({ onUpgradeClick }: UserMenuProps) {
             <button
               onClick={() => {
                 setIsOpen(false);
-                // TODO: navigate to settings/dashboard
+                router.push('/account');
               }}
               className="w-full px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
             >
@@ -102,7 +104,7 @@ export default function UserMenu({ onUpgradeClick }: UserMenuProps) {
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  // TODO: open billing portal
+                  router.push('/account?tab=subscription');
                 }}
                 className="w-full px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
               >

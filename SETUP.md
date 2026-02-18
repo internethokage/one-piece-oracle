@@ -140,9 +140,26 @@ Test the flow:
 
 ---
 
-## 6. Run Data Pipeline
+## 6. Seed Test Data (Quick Start)
 
-Once auth is working, populate the database:
+Want to see the app working immediately without running the full scraper pipeline? Use the seed script:
+
+```bash
+npm run seed
+```
+
+This inserts:
+- **5 sample chapters** (Alabasta arc)
+- **10 sample panels** with placeholder images + real dialogue
+- **8 SBS Q&A entries** (Oda answering fan questions)
+
+Full-text search works immediately. Semantic search needs real embeddings (run the pipeline below for that).
+
+---
+
+## 7. Run Data Pipeline
+
+Once auth is working, populate the database with real manga data:
 
 ```bash
 # Scrape Alabasta arc panels from One Piece Wiki
