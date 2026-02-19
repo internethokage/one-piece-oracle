@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/rate-limit';
 
 // Lazy initialization to avoid build-time errors
 let supabase: SupabaseClient | null = null;
@@ -48,6 +49,22 @@ interface SBSEntry {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limiting — stricter for expensive LLM calls
+  const ip = getClientIP(request);
+  const rl = checkRateLimit(`ask:${ip}`, RATE_LIMITS.ask);
+  const rlHeaders = {
+    'X-RateLimit-Limit': String(RATE_LIMITS.ask.max),
+    'X-RateLimit-Remaining': String(rl.remaining),
+    'X-RateLimit-Reset': String(rl.resetAt),
+  };
+
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: 'Too many AI requests. The Oracle needs a moment to think.', retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
+      { status: 429, headers: { ...rlHeaders, 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   try {
     const { question, user_tier = 'free' } = await request.json();
 
@@ -92,7 +109,7 @@ export async function POST(request: NextRequest) {
       citations: answer.citations,
       model: LLM_MODEL,
       timestamp: new Date().toISOString(),
-    });
+    }, { headers: rlHeaders });
   } catch (error) {
     console.error('Ask endpoint error:', error);
     return NextResponse.json(
