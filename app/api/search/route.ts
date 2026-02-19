@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/rate-limit';
 
 // Lazy initialization to avoid build-time errors
 let supabase: SupabaseClient | null = null;
@@ -47,6 +48,22 @@ interface SearchResult {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const ip = getClientIP(request);
+  const rl = checkRateLimit(`search:${ip}`, RATE_LIMITS.search);
+  const rlHeaders = {
+    'X-RateLimit-Limit': String(RATE_LIMITS.search.max),
+    'X-RateLimit-Remaining': String(rl.remaining),
+    'X-RateLimit-Reset': String(rl.resetAt),
+  };
+
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Slow down, nakama.', retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
+      { status: 429, headers: { ...rlHeaders, 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   try {
     const { query, method = 'semantic', limit = 20 } = await request.json();
 
@@ -79,7 +96,7 @@ export async function POST(request: NextRequest) {
       method,
       results,
       timestamp: new Date().toISOString(),
-    });
+    }, { headers: rlHeaders });
   } catch (error) {
     console.error('Search error:', error);
     return NextResponse.json(
